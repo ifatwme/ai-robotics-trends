@@ -21,43 +21,43 @@ import statsmodels.formula.api as smf
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
-from .. import config as C
+from .. import config as cfg  # not "C": patsy formulas use C() for categoricals
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
-O = C.OUT_DIR
+O = cfg.OUT_DIR
 
 
 def load_series() -> dict[tuple[str, str], pd.DataFrame]:
-    days = [d.date().isoformat() for d in C.days()]
+    days = [d.date().isoformat() for d in cfg.days()]
     series: dict[tuple[str, str], pd.DataFrame] = {}
 
     def add(key, counts: pd.Series):
         counts = counts.reindex(days)
         series[key] = pd.DataFrame({"day": days, "y": counts.values})
 
-    p = C.DATA_DIR / "bsky_counts.json"
+    p = cfg.DATA_DIR / "bsky_counts.json"
     if p.exists():
         bc = pd.DataFrame(json.loads(p.read_text()))
         for kw, g in bc.groupby("kw"):
             add(("Bluesky", kw), g.set_index("day").hits)
-    p = C.DATA_DIR / "hn.json"
+    p = cfg.DATA_DIR / "hn.json"
     if p.exists():
         hn = pd.DataFrame(json.loads(p.read_text()))
-        for q in C.HN_VOLUME_SERIES:
+        for q in cfg.HN_VOLUME_SERIES:
             g = hn[hn.q == q]
             if len(g):
                 add(("HN comments", q), g.set_index("day").comment_hits)
-    p = C.DATA_DIR / "reddit.json"
+    p = cfg.DATA_DIR / "reddit.json"
     if p.exists():
         rd = pd.read_json(p)
         if len(rd):
             rd["day"] = pd.to_datetime(rd.created_utc, unit="s", utc=True).dt.strftime("%Y-%m-%d")
             for s, g in rd.groupby("subreddit"):
                 add(("Reddit posts", "r/" + s), g.groupby("day").size().reindex(days, fill_value=0))
-    p = C.DATA_DIR / "masto.json"
+    p = cfg.DATA_DIR / "masto.json"
     if p.exists():
         ma = pd.read_json(p)
         if len(ma):
@@ -67,13 +67,13 @@ def load_series() -> dict[tuple[str, str], pd.DataFrame]:
                 est = {}
                 for day, h in g.groupby("day"):
                     n = len(h)
-                    if n >= C.MASTODON_MAX_PER_DAY:  # truncated sample -> extrapolate from observed rate
+                    if n >= cfg.MASTODON_MAX_PER_DAY:  # truncated sample -> extrapolate from observed rate
                         span = (h.created.max() - h.created.min()).total_seconds() / 3600
                         n = round(n / max(span, 0.25) * 24)
                     est[day] = n
                 add(("Mastodon #", tag), pd.Series(est).reindex(days, fill_value=0))
 
-    _, cur, _ = C.window()
+    _, cur, _ = cfg.window()
     for g in series.values():
         g["date"] = pd.to_datetime(g.day)
         g["dow"] = g.date.dt.dayofweek
@@ -148,13 +148,13 @@ def share_of_voice(series, names, label):
     return T, dict(chi2=float(chi2), p=float(p), dof=int(dof), cramers_v=float(cv))
 
 
-def outlook(g: pd.DataFrame, sims: int = 4000, seed: int = C.SEED):
+def outlook(g: pd.DataFrame, sims: int = 4000, seed: int = cfg.SEED):
     """Next-7-day projection from a day-of-week NB model on the last 28 days (no trend extrapolation)."""
     h = g.dropna(subset=["y"]).tail(28).copy()
     h["y"] = h.y.astype(float)
     m = smf.negativebinomial("y ~ C(dow)", data=h).fit(disp=0, maxiter=300)
     alpha = m.params["alpha"]
-    _, _, end = C.window()
+    _, _, end = cfg.window()
     fut = pd.DataFrame({"date": pd.date_range(pd.Timestamp(end.date()), periods=7)})
     X = pd.get_dummies(fut.date.dt.dayofweek.astype("category").cat.set_categories(range(7)),
                        prefix="C(dow)", drop_first=True).astype(float)
@@ -212,8 +212,8 @@ def run() -> dict:
                             mean_before=float(np.expm1(x[:t].mean())), mean_after=float(np.expm1(x[t:].mean()))))
     pd.DataFrame(cps).to_csv(O / "volume_changepoints.csv", index=False)
 
-    sov_ai, t_ai = share_of_voice(series, C.AI_BRANDS, "ai_brands")
-    sov_rb, t_rb = share_of_voice(series, C.ROBOTICS_BRANDS, "robotics_brands")
+    sov_ai, t_ai = share_of_voice(series, cfg.AI_BRANDS, "ai_brands")
+    sov_rb, t_rb = share_of_voice(series, cfg.ROBOTICS_BRANDS, "robotics_brands")
 
     pr = []
     for key in [("Bluesky", "AI"), ("Bluesky", "robot"), ("Bluesky", "humanoid"), ("Bluesky", "Claude"),
@@ -226,7 +226,7 @@ def run() -> dict:
     pd.DataFrame(pr).to_csv(O / "outlook_next7.csv", index=False)
 
     # ---------------- figures
-    _, cur, _ = C.window()
+    _, cur, _ = cfg.window()
     curx = pd.Timestamp(cur.date())
     plt.rcParams.update({"figure.dpi": 130, "font.size": 9})
     fig, axes = plt.subplots(2, 1, figsize=(11, 6.5), sharex=True)
