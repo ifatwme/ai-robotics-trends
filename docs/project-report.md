@@ -1,85 +1,62 @@
-# AI & Robotics Social-Media Trends (November 2026): Project Status Report
-_Status as of 2026-11-09 ~13:20 UTC · Host: Testilonia (65.109.162.75) · Project root: `/root/aitrends`_
+# Project report — AI & Robotics Social-Media Trends
 
-## 1. Scope
-- **Question:** What were the social-media trends around AI and robotics in November 2026, measured with statistics and ML?
-- **Window:** November is still in progress. The analysis covers **Nov 1–8 (complete days)**, with **October 1–31 as the baseline**. Nov 9 data (to 12:00 UTC) was collected but is left out of inference because it is a partial day.
+_Status: 2026-11-09 · Repo: https://github.com/ifatwme/ai-robotics-trends · Live: https://65.109.162.75 (VPS) and
+https://ifatwme.github.io/ai-robotics-trends/ (GitHub Pages, after the first successful weekly run)_
 
-## 2. Data collected (done)
-| Source | Method | Volume |
-|---|---|---|
-| Bluesky: keyword counts | Public AppView search, `hitsTotal` per keyword-day, 35 keywords × 40 days | 1,400 series-days |
-| Bluesky: "AI" uncapped counts | Adaptive sub-day windows (the API caps counts at 10k) | 632 windows, 0 still capped |
-| Bluesky: posts | Top-200/day for 8 queries | 28,539 posts |
-| Hacker News | Algolia: stories + comment counts, 36 queries × 40 days | 32,833 story hits, 0 failed query-days after repair |
-| Reddit | Arctic Shift archive, full census of 20 AI/robotics subreddits | ~41 MB raw |
-| Mastodon | mastodon.social hashtag timelines, 12 tags | ~40 MB raw |
+## 1. Goal
+Measure how AI and robotics are discussed on social media with real collected data, statistical inference and
+machine learning, and publish the results as a weekly-updated dashboard. Methods and the rationale for every metric:
+[`methodology.md`](methodology.md).
 
-Unified corpus after relevance filtering and de-duplication: about **98k documents** (`data/corpus.pkl`).
+## 2. First edition — week 2026-11-02 → 2026-11-08 vs 4-week baseline (2026-10-05 → 2026-11-01)
+88,487 posts (Bluesky 19.1k, Hacker News 7.8k, Mastodon 16.7k, Reddit 44.9k); 83 volume series, 19 significant
+after Benjamini–Hochberg FDR.
 
-**Not available:** X/Twitter (no API credentials; `xurl` not set up), TikTok, Instagram, LinkedIn and YouTube. Direct Reddit access is blocked from this server, so the Arctic Shift archive was used instead. The web-search backend was down, so there is no external news context yet.
-
-## 3. Analysis
-### Done
-- **ML enrichment:** MiniLM sentence embeddings computed for all documents (about 27 min on CPU).
-- **Volume statistics** (`analysis_volume.py`, preliminary run on Bluesky + HN):
-  - Negative-binomial GLMs with day-of-week effects; rate ratios; Benjamini–Hochberg FDR.
-  - Robust burst detection.
-  - Change-point detection.
-  - χ² share-of-voice tests.
-  - Full-month projection by simulation.
-
-### In progress
-- **Sentiment scoring** with Twitter-RoBERTa (int8-quantized for CPU speed) plus a VADER cross-check on about 91k documents. ETA is roughly 25–35 min.
-
-### Still to run
-- **Volume statistics re-run** with the Reddit and Mastodon series added.
-- **Text/ML analysis** (`analysis_text.py`, written, not yet run):
-  - Embedding k-means topics (k chosen by silhouette), labelled with c-TF-IDF.
-  - NMF cross-check.
-  - Platform-stratified CMH topic-momentum tests.
-  - Log-odds emerging terms.
-  - Sentiment CIs and tests.
-  - Gradient-boosting engagement model (CV AUC, permutation importance).
-  - UMAP topic map.
-
-## 4. Preliminary findings (Bluesky + HN only; to be confirmed)
-- **Overall AI volume is flat to slightly down.** Bluesky "AI" is about 23.2k posts/day in Nov vs 25.7k in Oct (IRR 0.93, not significant after FDR).
-- **Nvidia is the November breakout.** +62% daily rate (q=0.03), share of voice up +5.0 pp, and a burst on Nov 8 (2,035 posts vs ~450 baseline).
-- **Claude/Anthropic split by platform.** HN comments mentioning Claude are up +49% (q<0.001, change point Nov 2). Top HN threads include Claude Code privacy/security stories and Goldman Sachs pulling Claude Code. On Bluesky, Anthropic and OpenAI share of voice fell.
-- **"AI bubble" narrative.** Change point Oct 26, peak Oct 30 (858/day), still about +62% vs the October average (q≈0.10).
-- **Significant declines:** "LLM" −25%, "artificial intelligence" −27%, Sora −21%, AGI −22%, ChatGPT −12% (all q<0.05).
-- **Robotics:**
-  - Generic "robot" volume is stable.
-  - "humanoid" is −10%.
-  - Boston Dynamics is −70% after its October bursts.
-  - Waymo and robotaxi gained share (+5.5 pp, +3.9 pp), with a robotaxi/self-driving burst on Nov 6.
-- **November bursts:** "AI regulation" on Nov 4–6 and "data center" on Nov 4–6.
-
-## 5. Engineering and deployment (done)
-- **Code:** `app/` holds collectors, corpus builder, ML enrichment, two analysis modules and the site renderer. Paths are configurable through environment variables.
-- **Containers:**
-  - `aitrends-pipeline:1.0.0`: Python 3.14-slim, pinned deps, CPU torch, non-root uid 10001, tini.
-  - `aitrends-web:1.0.0`: nginx-unprivileged 1.29-alpine.
-- **Compose (`docker-compose.yml`):** The web service is read-only, drops all capabilities, sets no-new-privileges, has memory/CPU/PID limits, log rotation, a healthcheck and `restart: unless-stopped`. The pipeline is a one-off job (profile `pipeline`; `COLLECT=1` re-downloads the data).
-- **HTTPS:** Let's Encrypt IP certificate (short-lived profile, via lego HTTP-01). HTTP redirects to HTTPS, and security headers are set. Renewal runs from the systemd timer `aitrends-cert-renew.timer` twice a day via `scripts/renew_cert.sh`.
-- **Live:** `https://65.109.162.75/`, currently showing the preliminary volume results. It returns HTTP 200 from Germany, Iceland and Russia.
-
-## 6. Issues encountered
-| Issue | Resolution |
+| Finding | Evidence |
 |---|---|
-| Hacker News API rate limits (675 failed query-days) | Repaired with a slower, incrementally-saving script |
-| Bluesky 10k count cap | Adaptive window splitting |
-| `ruptures` would not build on Python 3.14 | Wrote a custom change-point detector |
-| Slow sentiment scoring | Quantized the model |
-| Dashboard unreachable from Iran (connection reset; the Iran probe also failed) | ISP-level filtering, not a server fault; open it through a VPN |
+| Overall AI chatter **dipped** | Bluesky "AI" 23.6k vs 25.9k posts/day, −9% (q = 0.023) |
+| **Nvidia** is the week's breakout | +64% Bluesky, +92% HN comments (q < 0.05); share of AI-brand voice +5.7 pp → 13.3%; spike on 11-08 (2,035 vs ~450/day) |
+| **Claude** gains developer attention, **Anthropic** loses broad share | +46% HN comments (q < 0.05); Anthropic share of voice −3.3 pp |
+| Generic/hype terms cool | "LLM" −27%, "AGI" −23% on Bluesky; r/singularity −27%, r/GeminiAI −41% posts |
+| **Autonomous driving** is the robotics story | Waymo share of robotics-brand voice +6.0 pp → 37.1%; robotaxi & self-driving spikes on 11-06 |
+| Humanoid hype fades | Boston Dynamics −69% (after October bursts) |
+| Politics enters the AI conversation | Emerging terms: midterms, voters, democrats, schools, data centers, "GPT-6 cyber"; "AI regulation" spike 11-05 |
+| New robotics vocabulary | Cybertruck production, ABB Robotics / SoftBank, Agility, China, home robots |
+| Sentiment: robotics warmer than AI | net +0.116 robotics vs +0.054 AI (13% vs 8% positive posts); week-over-week changes small — see caveat |
+| What gets engagement | GBM top-decile classifier CV AUC 0.67 vs 0.62 content-free baseline; length, sentiment, links matter most |
 
-## 7. Next steps
-1. Finish sentiment scoring, then rebuild the corpus.
-2. Run the full pipeline **inside the pipeline container** (`docker compose run --rm pipeline`), after `chown 10001` on `data/ out/ site/ cache/`.
-3. Inspect the topics and write human-readable labels and a key-findings narrative (`out/topic_labels.json`, `out/findings.html`).
-4. Re-render and publish the site, then verify it externally.
-5. Optional: add X/Twitter if you provide API credentials, and add news context once web search works again.
+Spike causes are not asserted in this report: the dashboard lists the most-engaged posts per topic so they can be checked.
 
-## 8. File map
-`app/` code · `docker/` Dockerfiles, nginx.conf, run_pipeline.sh · `docker-compose.yml` · `requirements.txt` · `scripts/renew_cert.sh` · `data/` raw data and caches · `out/` results · `site/` published website · `certs/`, `tls/` certificates · `logs/` and `log_*.txt` run logs · `venv/` dev environment
+## 3. Confidence
+High: volume changes (NB GLM + FDR), spikes, brand share of voice. Medium: topics (silhouette 0.059, NMI 0.39 vs NMF),
+emerging terms, engagement model, outlook. **Low–medium: sentiment** (Cohen's κ 0.16 vs VADER).
+Not covered: X/Twitter, TikTok, Instagram, LinkedIn, YouTube.
+
+## 4. Engineering
+* **Repo layout:** `src/aitrends` package (collect → corpus → enrich → volume/text → history → site), `docker/`,
+  `docker-compose.yml` + `deploy/compose.server.yml`, `deploy/systemd/`, `scripts/`, `.github/workflows/`, `docs/`.
+* **Containers:** `pipeline` (Python 3.14, non-root, batch job) and `web` (nginx-unprivileged, read-only, health-checked),
+  hardened with dropped capabilities, no-new-privileges, resource limits and log rotation.
+* **VPS:** HTTPS with a Let's Encrypt IP certificate, twice-daily renewal timer, weekly pipeline timer (Mon 03:30 UTC).
+* **GitHub:** CI (lint, compose validation, both image builds, web smoke test, import of every module) and a weekly
+  workflow (Mon 04:17 UTC) that builds, collects, analyses, caches ML results, commits `history/weekly_metrics.csv`
+  and deploys GitHub Pages. Free on a public repository.
+* **Resources per weekly run:** ~45–70 min on 4 vCPU (first run ~2 h), peak RAM 3–4 GB, ~5 GB disk.
+
+## 5. Issues found and fixed during delivery
+| Issue | Fix |
+|---|---|
+| Bluesky counts capped at 10,000 | adaptive sub-day windows |
+| HN / Arctic Shift / Mastodon rate limiting → partial data | per-host throttling, retries on 429/5xx/"slow down" 422, failed units recorded as missing (never zero), gap-fill mode |
+| Linear-trend forecast exploded on bursty series | day-of-week run-rate model |
+| `config as C` shadowed patsy's `C()` in model formulas | alias renamed |
+| pandas attribute collisions (`.count`, `.pct_change`) in the site renderer | explicit column access |
+| Unanchored `site/` in `.gitignore` kept `src/aitrends/site/` out of git | patterns anchored; CI now imports every module |
+| lego v5 CLI change broke certificate renewal | `run` handles issue + renewal |
+| Dashboard unreachable from Iran | ISP filtering, verified reachable from DE/IS/RU — use a VPN |
+
+## 6. Next steps
+1. Confirm the first GitHub Pages deployment (weekly workflow on the latest commit).
+2. Methodology improvements: hand-labelled sentiment validation set, consistent bot removal, better topic model,
+   day-block bootstrap for share of voice (see `methodology.md` §6).
+3. Optional: add X/Twitter if API credentials are provided.
