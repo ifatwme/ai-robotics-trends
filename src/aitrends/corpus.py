@@ -55,8 +55,11 @@ def build() -> pd.DataFrame:
                          author=s["author"], eng=s["points"] + s["comments"], likes=s["points"],
                          comments=s["comments"], source="hn:story",
                          url=f"https://news.ycombinator.com/item?id={s['id']}"))
-    for m in _load("masto.json"):
-        if m.get("lang") not in (None, "en"):
+    masto = _load("masto.json")
+    # drop bot accounts only if every row carries the flag, otherwise filtering would bias one period
+    drop_bots = bool(masto) and all("bot" in m for m in masto)
+    for m in masto:
+        if m.get("lang") not in (None, "en") or (drop_bots and m.get("bot")):
             continue
         rows.append(dict(platform="Mastodon", id="ma:" + m["id"], text=_strip_html(m["html"]), created=m["created"],
                          author=m["acct"], eng=m["favs"] + 2 * m["boosts"] + m["replies"], likes=m["favs"],

@@ -60,6 +60,12 @@ def load_series() -> dict[tuple[str, str], pd.DataFrame]:
     p = cfg.DATA_DIR / "masto.json"
     if p.exists():
         ma = pd.read_json(p)
+        fp = cfg.DATA_DIR / "masto_failed.json"
+        failed_days: dict[str, set] = {}
+        for f in (json.loads(fp.read_text()) if fp.exists() else []):
+            failed_days.setdefault(f["tag"], set()).add(f["day"])
+        if "bot" in ma and ma.bot.notna().all():  # only with complete bot info (avoids period bias)
+            ma = ma[~ma.bot.fillna(False).astype(bool)]
         if len(ma):
             ma["created"] = pd.to_datetime(ma.created, utc=True)
             ma["day"] = ma.created.dt.strftime("%Y-%m-%d")
@@ -71,7 +77,9 @@ def load_series() -> dict[tuple[str, str], pd.DataFrame]:
                         span = (h.created.max() - h.created.min()).total_seconds() / 3600
                         n = round(n / max(span, 0.25) * 24)
                     est[day] = n
-                add(("Mastodon #", tag), pd.Series(est).reindex(days, fill_value=0))
+                ser = pd.Series(est).reindex(days, fill_value=0).astype(float)
+                ser[[d for d in failed_days.get(tag, ()) if d in ser.index]] = np.nan  # missing, not zero
+                add(("Mastodon #", tag), ser)
 
     _, cur, _ = cfg.window()
     for g in series.values():

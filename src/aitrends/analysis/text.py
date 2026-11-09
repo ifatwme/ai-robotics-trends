@@ -110,6 +110,14 @@ def run() -> dict:
                            platform_mix=df.loc[idx, "platform"].value_counts(normalize=True).round(2).to_dict(),
                            examples=" ||| ".join(df.text.iloc[rep].str[:160])))
     T = pd.DataFrame(topics)
+    # make labels unique: if two topics share a label (or the same word set), append the next distinctive term
+    seen: dict[frozenset, int] = {}
+    for i, r in T.iterrows():
+        key = frozenset(r.label.split(" · "))
+        if key in seen:
+            extra = [w for w in r.terms.split(", ") if w not in key][:1]
+            T.at[i, "label"] = r.label + (" · " + extra[0] if extra else f" ({i})")
+        seen[frozenset(T.at[i, "label"].split(" · "))] = i
     T.to_csv(O / "topics.csv", index=False)
     lab = dict(zip(T.topic, T.label))
     df["topic_label"] = df.topic.map(lab)

@@ -2,7 +2,7 @@
 
 Stages (run in this order by `all`):
   collect   download raw data for the rolling window (Bluesky, Hacker News, Mastodon, Reddit)
-            single source: collect:bluesky | collect:hn | collect:reddit | collect:mastodon
+            single source: collect:bluesky | collect:hn | collect:reddit | collect:mastodon | collect:mastodon-gaps
   corpus    unify + filter + label documents
   enrich    embeddings + sentiment (cached, incremental)
   volume    count statistics (NB GLMs, bursts, change points, share of voice, outlook)
@@ -29,10 +29,11 @@ def run_stage(name: str) -> None:
         from .collect import bluesky, hackernews, mastodon, reddit
         src = name.partition(":")[2] or "all"
         jobs = {"bluesky": [bluesky.collect_counts, bluesky.collect_posts], "hn": [hackernews.collect],
-                "reddit": [reddit.collect], "mastodon": [mastodon.collect]}
+                "reddit": [reddit.collect], "mastodon": [mastodon.collect],
+                "mastodon-gaps": [lambda: mastodon.collect(fill_gaps=True)]}
         if src != "all" and src not in jobs:
             raise SystemExit(f"unknown source {src!r}; choose from {list(jobs)}")
-        for fn in (sum(jobs.values(), []) if src == "all" else jobs[src]):
+        for fn in ([f for k, v in jobs.items() if k != "mastodon-gaps" for f in v] if src == "all" else jobs[src]):
             fn()
     elif name == "corpus":
         from . import corpus
