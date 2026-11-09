@@ -13,7 +13,7 @@ MIN_INTERVAL = {
     "hn.algolia.com": 0.40,           # ~10k req/hour limit
     "mastodon.social": 1.05,          # 300 req / 5 min for anonymous clients
     "api.bsky.app": 0.08,
-    "arctic-shift.photon-reddit.com": 0.40,
+    "arctic-shift.photon-reddit.com": 1.0,   # returns 422 "Timeout. Maybe slow down" under load
 }
 
 _session = requests.Session()
@@ -45,7 +45,9 @@ def get_json(url: str, params: dict | None = None, tries: int = 7, timeout: int 
             status = r.status_code
             if r.status_code == 200:
                 return r.json()
-            if r.status_code in (429, 500, 502, 503, 504):
+            transient = r.status_code in (429, 500, 502, 503, 504) or (
+                r.status_code == 422 and ("timeout" in r.text.lower() or "slow down" in r.text.lower()))
+            if transient:
                 reset = r.headers.get("Retry-After")
                 time.sleep(float(reset) if reset and reset.isdigit() else min(60, 3 * 2 ** attempt))
                 continue

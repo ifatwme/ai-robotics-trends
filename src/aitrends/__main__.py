@@ -2,6 +2,7 @@
 
 Stages (run in this order by `all`):
   collect   download raw data for the rolling window (Bluesky, Hacker News, Mastodon, Reddit)
+            single source: collect:bluesky | collect:hn | collect:reddit | collect:mastodon
   corpus    unify + filter + label documents
   enrich    embeddings + sentiment (cached, incremental)
   volume    count statistics (NB GLMs, bursts, change points, share of voice, outlook)
@@ -24,13 +25,15 @@ STAGES = ["collect", "corpus", "enrich", "volume", "text", "history", "site"]
 def run_stage(name: str) -> None:
     t = time.time()
     print(f"==> {name}", flush=True)
-    if name == "collect":
+    if name.startswith("collect"):
         from .collect import bluesky, hackernews, mastodon, reddit
-        bluesky.collect_counts()
-        bluesky.collect_posts()
-        hackernews.collect()
-        reddit.collect()
-        mastodon.collect()
+        src = name.partition(":")[2] or "all"
+        jobs = {"bluesky": [bluesky.collect_counts, bluesky.collect_posts], "hn": [hackernews.collect],
+                "reddit": [reddit.collect], "mastodon": [mastodon.collect]}
+        if src != "all" and src not in jobs:
+            raise SystemExit(f"unknown source {src!r}; choose from {list(jobs)}")
+        for fn in (sum(jobs.values(), []) if src == "all" else jobs[src]):
+            fn()
     elif name == "corpus":
         from . import corpus
         corpus.build()

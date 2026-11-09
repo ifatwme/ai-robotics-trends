@@ -36,7 +36,7 @@ def collect() -> None:
     base, _, end = C.window()
     a, b = int(base.timestamp()), int(end.timestamp())
     rows = []
-    with ThreadPoolExecutor(3) as ex:
+    with ThreadPoolExecutor(2) as ex:
         for r in ex.map(lambda s: _sub(s, a, b), C.REDDIT_SUBS):
             rows.extend(r)
     uniq = {r["id"]: r for r in rows}
