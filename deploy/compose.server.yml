@@ -1,0 +1,9 @@
+# Production override for a single VPS: HTTPS (Let's Encrypt) on 80/443.
+#   COMPOSE_FILE=docker-compose.yml:deploy/compose.server.yml  (set in .env)
+services:
+  web:
+    ports: !override ["80:8080", "443:8443"]
+    volumes:
+      - ./docker/nginx/https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/acme:/var/www/acme:ro
+      - ./deploy/tls:/etc/nginx/tls:ro

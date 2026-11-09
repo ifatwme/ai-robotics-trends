@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the aitrends pipeline every Monday
+
+[Timer]
+OnCalendar=Mon *-*-* 03:30:00 UTC
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

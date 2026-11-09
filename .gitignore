@@ -1,0 +1,22 @@
+# generated
+data/
+out/
+site/
+cache/
+state/
+logs/
+*.pkl
+*.npy
+# secrets / server-local
+.env
+deploy/certs/
+deploy/tls/
+deploy/acme/
+*.pem
+*.key
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/

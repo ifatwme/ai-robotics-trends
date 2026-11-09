@@ -1,0 +1,50 @@
+# Base stack — works on any Docker host (and in GitHub Actions).
+#   docker compose up -d web                         # serve ./site on http://localhost:${WEB_PORT:-8080}
+#   docker compose run --rm pipeline collect all     # refresh data + rebuild ./site
+# Production server: add deploy/compose.server.yml (TLS on 80/443), see README.
+name: aitrends
+
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  web:
+    <<: *hardening
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    image: ${WEB_IMAGE:-aitrends-web:latest}
+    container_name: aitrends-web
+    ports: ["${WEB_PORT:-8080}:8080"]
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+    read_only: true
+    tmpfs: ["/tmp:size=16m"]
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 100
+
+  pipeline:
+    <<: *hardening
+    build: { context: ., dockerfile: docker/pipeline.Dockerfile }
+    image: ${PIPELINE_IMAGE:-aitrends-pipeline:latest}
+    profiles: ["pipeline"]            # batch job, never started by `up`
+    user: "${PIPELINE_UID:-10001}:${PIPELINE_GID:-10001}"
+    environment:
+      WINDOW_END: ${WINDOW_END:-}
+      CURRENT_DAYS: ${CURRENT_DAYS:-7}
+      BASELINE_DAYS: ${BASELINE_DAYS:-28}
+      REPO_URL: ${REPO_URL:-}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+    volumes:
+      - ./data:/work/data
+      - ./out:/work/out
+      - ./site:/work/site
+      - ${HISTORY_HOST_DIR:-./history}:/work/history
+      - ./cache:/work/cache
+    tmpfs: ["/tmp:size=1g"]
+    restart: "no"
+    mem_limit: ${PIPELINE_MEM:-6g}

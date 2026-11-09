@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["history/**", "**.md", "docs/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Lint (ruff) + byte-compile
+        run: |
+          pip install ruff==0.14.*
+          ruff check src --select E9,F63,F7,F82,F401
+          python -m compileall -q src
+      - name: Validate compose files
+        run: |
+          docker compose config -q
+          docker compose -f docker-compose.yml -f deploy/compose.server.yml config -q
+      - uses: docker/setup-buildx-action@v3
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with: { context: ., file: docker/web.Dockerfile, tags: aitrends-web:ci, load: true }
+      - name: Smoke-test web image
+        run: |
+          mkdir -p site && echo '<h1>ok</h1>' > site/index.html
+          docker run -d --name w -p 8080:8080 -v "$PWD/site:/usr/share/nginx/html:ro" aitrends-web:ci
+          sleep 3 && curl -fsS http://localhost:8080/healthz && curl -fsS http://localhost:8080/ | grep -q ok
+      - name: Build pipeline image + CLI smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/pipeline.Dockerfile
+          tags: aitrends-pipeline:ci
+          load: true
+          cache-from: type=gha,scope=pipeline
+          cache-to: type=gha,scope=pipeline,mode=max
+      - run: docker run --rm aitrends-pipeline:ci --help

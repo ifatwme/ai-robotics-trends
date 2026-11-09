@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew Let's Encrypt certificate for the aitrends dashboard
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/ai-robotics-trends
+ExecStart=/root/ai-robotics-trends/scripts/renew_cert.sh

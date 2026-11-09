@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly AI & robotics social-media trend refresh (Docker pipeline)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/ai-robotics-trends
+ExecStart=/root/ai-robotics-trends/scripts/weekly_update.sh
+TimeoutStartSec=6h
+Nice=10
