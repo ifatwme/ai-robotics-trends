@@ -13,8 +13,8 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Lint (ruff) + byte-compile
@@ -26,17 +26,17 @@ jobs:
         run: |
           docker compose config -q
           docker compose -f docker-compose.yml -f deploy/compose.server.yml config -q
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build web image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with: { context: ., file: docker/web.Dockerfile, tags: aitrends-web:ci, load: true }
       - name: Smoke-test web image
         run: |
           mkdir -p site && echo '<h1>ok</h1>' > site/index.html
-          docker run -d --name w -p 8080:8080 -v "$PWD/site:/usr/share/nginx/html:ro" aitrends-web:ci
+          docker run -d --name aitrends-smoke -p 8080:8080 -v "$PWD/site:/usr/share/nginx/html:ro" aitrends-web:ci
           sleep 3 && curl -fsS http://localhost:8080/healthz && curl -fsS http://localhost:8080/ | grep -q ok
       - name: Build pipeline image + CLI smoke test
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/pipeline.Dockerfile

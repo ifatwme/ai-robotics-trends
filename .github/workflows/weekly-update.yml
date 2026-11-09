@@ -28,15 +28,15 @@ jobs:
       WINDOW_END: ${{ inputs.window_end }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Free disk space (~10 GB)
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build pipeline image (layer-cached)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/pipeline.Dockerfile
@@ -46,7 +46,7 @@ jobs:
           cache-to: type=gha,scope=pipeline,mode=max
 
       - name: Restore ML caches (embeddings, sentiment, HF models)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             data/emb_cache.pkl
@@ -64,7 +64,7 @@ jobs:
 
       - name: Save ML caches
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             data/emb_cache.pkl
@@ -81,13 +81,13 @@ jobs:
           git push
 
       - name: Keep run outputs (30 days)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: analysis-output
           path: out/
           retention-days: 30
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -99,4 +99,4 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - id: pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
