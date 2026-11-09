@@ -44,4 +44,14 @@ jobs:
           load: true
           cache-from: type=gha,scope=pipeline
           cache-to: type=gha,scope=pipeline,mode=max
-      - run: docker run --rm aitrends-pipeline:ci --help
+      - name: Import every module inside the image
+        run: |
+          docker run --rm --entrypoint python aitrends-pipeline:ci -c "
+          import importlib, pkgutil, aitrends
+          mods = [m.name for m in pkgutil.walk_packages(aitrends.__path__, 'aitrends.') if not m.name.endswith('__main__')]
+          for m in mods: importlib.import_module(m)
+          required = {'aitrends.site.build', 'aitrends.analysis.text', 'aitrends.analysis.volume', 'aitrends.collect.mastodon'}
+          missing = required - set(mods)
+          assert not missing, f'missing modules: {missing}'
+          print('imported', len(mods), 'modules')"
+          docker run --rm aitrends-pipeline:ci --help

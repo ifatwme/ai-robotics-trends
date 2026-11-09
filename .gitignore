@@ -1,10 +1,10 @@
-# generated
-data/
-out/
-site/
-cache/
-state/
-logs/
+# generated (anchored to the repo root: an unanchored `site/` also ignored src/aitrends/site/)
+/data/
+/out/
+/site/
+/cache/
+/state/
+/logs/
 *.pkl
 *.npy
 # secrets / server-local
